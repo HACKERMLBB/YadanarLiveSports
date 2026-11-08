@@ -30,7 +30,6 @@
 - [⌨️ Commands](#️-commands)
 - [🚀 Tech Stack](#-tech-stack)
 - [⚙️ Installation](#️-installation)
-- [☁️ Deploy To Render](#️-deploy-to-render)
 - [🔑 Environment Variables](#-environment-variables)
 - [📁 Project Structure](#-project-structure)
 - [📸 Preview](#-preview)
@@ -108,7 +107,6 @@ Select your language from the menu. 23 languages available.
 
 - Language: Python 3.11
 - Framework: python-telegram-bot 20.7
-- Hosting: Render.com (Free Tier)
 - Web Server: Flask
 - API: Live Sports API
 - Database: JSON / In-Memory Cache
@@ -140,37 +138,6 @@ You will see:
 
 ### 5. Test On Telegram
 Go to [@YadanarLiveSportsBot](https://t.me/YadanarLiveSportsBot) and send /start
-
----
-
-## ☁️ Deploy To Render
-
-This bot is designed to run 24/7 on Render.com for FREE.
-
-### Step 1 - Push To GitHub
-Push all files to GitHub repo.
-
-### Step 2 - Create Web Service
-1. Go to [render.com](https://render.com)
-2. Click New + -> Web Service
-3. Select your GitHub repo
-4. Set:
-   - Name: yadanar-live-sports-bot
-   - Environment: Python 3
-   - Build Command: pip install -r requirements.txt
-   - Start Command: python main.py
-   - Instance Type: Free
-
-### Step 3 - Add Environment Variables
-In Render Dashboard -> Environment:
-    BOT_TOKEN = your_bot_token_here
-    SPORTS_API_KEY = your_api_key_here
-    CHANNEL_ID = your_channel_id_here
-
-### Step 4 - Deploy
-Click Create Web Service. Wait 2-3 minutes. Bot will be Online.
-
-Note: Render Free Tier sleeps after 15 min of inactivity. To keep bot always online, use UptimeRobot to ping your Render URL every 5 minutes.
 
 ---
 
@@ -357,7 +324,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Developer: [@bigolive_asia](https://t.me/bigolive_asia)
 - Bot: [@YadanarLiveSportsBot](https://t.me/YadanarLiveSportsBot)
 - API: Live Sports API
-- Hosting: Render.com
 
 ---
 
