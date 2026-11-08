@@ -9,16 +9,26 @@ from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQuer
 TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL = os.getenv("CHANNEL_ID")
 
+# ============ FLASK - UPTIMEROBOT ============
 app_flask = Flask(__name__)
+
 @app_flask.route('/')
 def home():
     return "Premium Sports Bot Running!"
 
+@app_flask.route('/ping')
+def ping():
+    return "OK", 200
+
+@app_flask.route('/health')
+def health():
+    return "Bot is Alive", 200
+
 def run_web():
     port = int(os.environ.get("PORT", 10000))
-    app_flask.run(host="0.0.0.0", port=port)
+    app_flask.run(host="0.0.0.0", port=port, threaded=True, use_reloader=False)
 
-# ============ PREMIUM DESIGN HELPERS ============
+# ============ HELPERS ============
 
 def bar(v1, v2, label):
     try:
@@ -57,21 +67,21 @@ def fetch_summary(sport, league, eid):
 
 def get_main_keyboard():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚽ Football", callback_data="menu_football"), InlineKeyboardButton("🏏 Cricket", callback_data="menu_cricket")],
-        [InlineKeyboardButton("🏀 Basketball", callback_data="menu_basketball"), InlineKeyboardButton("🎾 Tennis", callback_data="menu_tennis")],
-        [InlineKeyboardButton("🏑 Hockey", callback_data="menu_hockey"), InlineKeyboardButton("🏐 Volleyball", callback_data="menu_volleyball")],
-        [InlineKeyboardButton("🏓 Table Tennis", callback_data="menu_tabletennis"), InlineKeyboardButton("⚾ Baseball", callback_data="menu_baseball")],
-        [InlineKeyboardButton("🏈 NFL", callback_data="menu_nfl"), InlineKeyboardButton("🏸 Badminton", callback_data="menu_badminton")],
-        [InlineKeyboardButton("🏆 FIFA", callback_data="menu_fifa"), InlineKeyboardButton("🔴 LIVE ALL", callback_data="menu_live")],
-        [InlineKeyboardButton("✅ RESULTS", callback_data="menu_results")],
-        [InlineKeyboardButton("📢 Join Channel", url="https://t.me/bigolive_asia")]
+        [InlineKeyboardButton("Football", callback_data="menu_football"), InlineKeyboardButton("Cricket", callback_data="menu_cricket")],
+        [InlineKeyboardButton("Basketball", callback_data="menu_basketball"), InlineKeyboardButton("Tennis", callback_data="menu_tennis")],
+        [InlineKeyboardButton("Hockey", callback_data="menu_hockey"), InlineKeyboardButton("Volleyball", callback_data="menu_volleyball")],
+        [InlineKeyboardButton("Table Tennis", callback_data="menu_tabletennis"), InlineKeyboardButton("Baseball", callback_data="menu_baseball")],
+        [InlineKeyboardButton("NFL", callback_data="menu_nfl"), InlineKeyboardButton("Badminton", callback_data="menu_badminton")],
+        [InlineKeyboardButton("FIFA", callback_data="menu_fifa"), InlineKeyboardButton("LIVE ALL", callback_data="menu_live")],
+        [InlineKeyboardButton("RESULTS", callback_data="menu_results")],
+        [InlineKeyboardButton("Join Channel", url="https://t.me/bigolive_asia")]
     ])
 
 def get_back_keyboard(key):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔄 Refresh", callback_data=f"menu_{key}")],
-        [InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu_start")],
-        [InlineKeyboardButton("📢 Join Channel", url="https://t.me/bigolive_asia")]
+        [InlineKeyboardButton("Refresh", callback_data=f"menu_{key}")],
+        [InlineKeyboardButton("Back to Menu", callback_data="menu_start")],
+        [InlineKeyboardButton("Join Channel", url="https://t.me/bigolive_asia")]
     ])
 
 def format_premium(ev, sport, league):
@@ -279,14 +289,18 @@ def format_full(key):
     t += "".join(up[:3]) if up else "No Upcoming\n━━━━━━━━━━━━━━━━━━━━━━\n"
     return t
 
-# ============ HANDLERS WITH BUTTONS ============
+# ============ HANDLERS ============
+
+WELCOME_TEXT = (
+    "✨ 🏆 YADANAR LIVE SPORTS - PREMIUM SPORTS 🏆 ✨\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    "👋 Welcome to the Most Beautiful Live Sports Bot!\n\n"
+    "POWERD BY @t.me/bigolive_asia:"
+)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✨ <b>🏆 BIGO LIVE ASIA - PREMIUM SPORTS 🏆</b> ✨\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "👋 Welcome to the Most Beautiful Live Sports Bot!\n\n"
-        "👇 Button එකක් Click කරන්න:\n",
+        WELCOME_TEXT,
         parse_mode="HTML",
         reply_markup=get_main_keyboard()
     )
@@ -327,16 +341,14 @@ async def make_handler(key):
         await send_sport_to_chat(update.effective_chat.id, context, key)
     return handler
 
-# --- THIS IS THE BUTTON FIX ---
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer("Loading... ⏳")
     data = q.data
     print(f"Button Clicked: {data}")
     chat_id = update.effective_chat.id
-
     if data == "menu_start":
-        await context.bot.send_message(chat_id=chat_id, text="✨ <b>🏆 BIGO LIVE ASIA - PREMIUM SPORTS 🏆</b> ✨\n\n👇 Button එකක් Click කරන්න:", parse_mode="HTML", reply_markup=get_main_keyboard())
+        await context.bot.send_message(chat_id=chat_id, text=WELCOME_TEXT, parse_mode="HTML", reply_markup=get_main_keyboard())
     elif data == "menu_live":
         await send_live_to_chat(chat_id, context)
     elif data == "menu_results":
@@ -346,22 +358,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if key in SPORT_CONFIG:
             await send_sport_to_chat(chat_id, context, key)
 
-last = set()
+# ============ AUTO POST EVERY 3 MINUTES ============
 async def auto_job(context: ContextTypes.DEFAULT_TYPE):
-    global last
     try:
-        all_live=[]
+        if not CHANNEL:
+            return
         for key in SPORT_CONFIG.keys():
             title, live, _, _ = get_data(key)
-            for s in live:
-                all_live.append(f"{title}\n{s}")
-        cur=set(all_live)
-        new=cur-last
-        if last and new and CHANNEL:
-            for s in list(new)[:2]:
-                await context.bot.send_message(chat_id=CHANNEL, text=f"✨ <b>🔴 LIVE UPDATE</b> ✨\n\n{s}"[:4000], parse_mode="HTML")
-        if cur:
-            last=cur
+            if live:
+                text = f"✨ <b>🔴 LIVE UPDATE - {title}</b> ✨\n\n{live[0]}"[:4000]
+                await context.bot.send_message(chat_id=CHANNEL, text=text, parse_mode="HTML")
+                break
     except Exception as e:
         print("Auto Error:", e)
 
@@ -374,9 +381,8 @@ async def main():
     for key in SPORT_CONFIG.keys():
         h = await make_handler(key)
         app.add_handler(CommandHandler(key, h))
-    # Button Handler - මේක අනිවාර්යයි
     app.add_handler(CallbackQueryHandler(button_handler))
-    app.job_queue.run_repeating(auto_job, interval=120, first=10)
+    app.job_queue.run_repeating(auto_job, interval=180, first=10)
     print("Premium Bot Started!")
     await app.initialize()
     await app.start()
