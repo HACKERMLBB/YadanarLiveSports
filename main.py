@@ -3,8 +3,8 @@ import asyncio
 import threading
 import requests
 from flask import Flask
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 
 TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL = os.getenv("CHANNEL_ID")
@@ -29,7 +29,6 @@ def bar(v1, v2, label):
             return f"{label}\n{a} - {b}\n"
         p = int((a/tot)*12)
         q = 12 - p
-        # Beautiful bar
         return f"{label}\n{'🟦'*p}{'⬜'*q} {a:.0f}% - {b:.0f}%\n"
     except:
         return f"{label}: {v1} - {v2}\n"
@@ -56,6 +55,25 @@ def fetch_summary(sport, league, eid):
     except:
         return None
 
+def get_main_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("⚽ Football", callback_data="menu_football"), InlineKeyboardButton("🏏 Cricket", callback_data="menu_cricket")],
+        [InlineKeyboardButton("🏀 Basketball", callback_data="menu_basketball"), InlineKeyboardButton("🎾 Tennis", callback_data="menu_tennis")],
+        [InlineKeyboardButton("🏑 Hockey", callback_data="menu_hockey"), InlineKeyboardButton("🏐 Volleyball", callback_data="menu_volleyball")],
+        [InlineKeyboardButton("🏓 Table Tennis", callback_data="menu_tabletennis"), InlineKeyboardButton("⚾ Baseball", callback_data="menu_baseball")],
+        [InlineKeyboardButton("🏈 NFL", callback_data="menu_nfl"), InlineKeyboardButton("🏸 Badminton", callback_data="menu_badminton")],
+        [InlineKeyboardButton("🏆 FIFA", callback_data="menu_fifa"), InlineKeyboardButton("🔴 LIVE ALL", callback_data="menu_live")],
+        [InlineKeyboardButton("✅ RESULTS", callback_data="menu_results")],
+        [InlineKeyboardButton("📢 Join Channel", url="https://t.me/bigolive_asia")]
+    ])
+
+def get_back_keyboard(key):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Refresh", callback_data=f"menu_{key}")],
+        [InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu_start")],
+        [InlineKeyboardButton("📢 Join Channel", url="https://t.me/bigolive_asia")]
+    ])
+
 def format_premium(ev, sport, league):
     try:
         comp = ev['competitions'][0]
@@ -67,7 +85,6 @@ def format_premium(ev, sport, league):
         venue = comp.get('venue', {}).get('fullName','Unknown Stadium') if comp.get('venue') else 'Unknown Stadium'
         city = comp.get('venue', {}).get('address', {}).get('city','') if comp.get('venue') else ''
         comp_name = ev.get('season', {}).get('slug','').replace('-',' ').upper() if ev.get('season') else league.upper()
-        # Competition logo name mapping
         league_emoji = {"ENG.1":"🏴󐁧󐁢󐁥󐁮󐁧󐁿","ESP.1":"🇪🇸","GER.1":"🇩🇪","ITA.1":"🇮🇹","FRA.1":"🇫🇷","UEFA.CHAMPIONS":"⭐"}.get(league.upper(),"🏆")
 
         h = competitors[0]
@@ -78,8 +95,6 @@ def format_premium(ev, sport, league):
         a_short = a['team'].get('abbreviation','') if a else ""
         h_score = h.get('score','0')
         a_score = a.get('score','0') if a else "0"
-        h_color = h['team'].get('color','1a1a1a')
-        # Winner highlight
         winner = ""
         if state == 'post':
             if h_score > a_score:
@@ -89,7 +104,6 @@ def format_premium(ev, sport, league):
             else:
                 winner = "🤝 Draw Match"
 
-        # ===== HEADER =====
         t = ""
         t += "╔══════════════════════╗\n"
         if state == 'in':
@@ -99,34 +113,28 @@ def format_premium(ev, sport, league):
         else:
             t += f"║  🕒 <b>UPCOMING</b>  •  {short}  ║\n"
         t += "╚══════════════════════╝\n\n"
-
         t += f"{league_emoji} <b>{comp_name}</b>\n"
         t += f"🏟️ {venue} {city}\n"
         if state == 'in':
             t += f"⏱️ Match Progress: {progress_bar(short)}\n"
         t += "\n"
-
-        # ===== SCOREBOARD =====
         t += "┏━━━━━━━━━━━━━━━━━━━━┓\n"
         if state == 'pre':
             t += f"┃  <b>{h_name}</b>\n"
             t += f"┃         <b>VS</b>\n"
             t += f"┃  <b>{a_name}</b>\n"
         else:
-            # Show score big
             t += f"┃  <b>{h_name}</b>  [{h_short}]\n"
             t += f"┃      <b> {h_score}  -  {a_score} </b>\n"
             t += f"┃  <b>{a_name}</b>  [{a_short}]\n"
         t += "┗━━━━━━━━━━━━━━━━━━━━┛\n"
         if winner:
             t += f"\n{winner}\n"
-
         if state == 'pre':
             t += "\n<i>⏳ Match not started yet. Stay tuned!</i>\n"
             t += "━━━━━━━━━━━━━━━━━━━━━━\n"
             return t
 
-        # ===== DETAILS =====
         dj = fetch_summary(sport, league, eid)
         goals, cards, subs, timeline = [], [], [], []
         stats = {}
@@ -149,7 +157,6 @@ def format_premium(ev, sport, league):
                     timeline.append(f"  {clock}'  🟥 {ath}")
                 elif 'substitution' in tl:
                     subs.append(f"  {clock}'  🔄 {ath} ({team})")
-
             try:
                 teams = dj.get('boxscore', {}).get('teams', [])
                 if len(teams) >= 2:
@@ -163,14 +170,11 @@ def format_premium(ev, sport, league):
             except:
                 pass
 
-        # Timeline
         if timeline:
             t += f"\n📜 <b>MATCH TIMELINE</b>\n"
             t += "──────────────────────\n"
             for line in timeline:
                 t += f"{line}\n"
-
-        # Goals separate beautiful
         if goals:
             t += f"\n⚽ <b>GOAL SCORERS</b>\n"
             t += "──────────────────────\n"
@@ -178,20 +182,16 @@ def format_premium(ev, sport, league):
                 pen = " 🎯 PENALTY" if is_pen else ""
                 t += f"  ⏰ {clock}'  <b>{ath}</b>\n"
                 t += f"       └ {team}{pen}\n"
-
         if cards:
             t += f"\n🟨 <b>CARDS</b>\n"
             t += "──────────────────────\n"
             for c in cards:
                 t += f"{c}\n"
-
         if subs:
             t += f"\n🔄 <b>SUBSTITUTIONS</b>\n"
             t += "──────────────────────\n"
             for s in subs[:5]:
                 t += f"{s}\n"
-
-        # Stats Premium
         if stats:
             t += f"\n📊 <b>MATCH STATISTICS</b>\n"
             t += "──────────────────────\n"
@@ -208,7 +208,6 @@ def format_premium(ev, sport, league):
                     if k == 'possessionPct':
                         t += bar(v1, v2, lab) + "\n"
                     else:
-                        # Visual bar for shots etc
                         try:
                             a1 = float(v1); b1 = float(v2)
                             tot = a1+b1
@@ -222,14 +221,11 @@ def format_premium(ev, sport, league):
         else:
             if state == 'in':
                 t += f"\n📊 <i>Stats are updating live...</i>\n"
-
         t += "\n━━━━━━━━━━━━━━━━━━━━━━\n"
         t += "💬 <i>Follow for more live updates</i>  •  @bigolive_asia\n"
         return t
     except Exception as e:
         return f"Error: {e}\n━━━━━━━━━━━━━━\n"
-
-# ============ SPORTS ============
 
 SPORT_CONFIG = {
     "football": ("⚽ FOOTBALL", [("soccer","eng.1"),("soccer","esp.1"),("soccer","ger.1"),("soccer","ita.1"),("soccer","fra.1"),("soccer","uefa.champions")]),
@@ -283,32 +279,24 @@ def format_full(key):
     t += "".join(up[:3]) if up else "No Upcoming\n━━━━━━━━━━━━━━━━━━━━━━\n"
     return t
 
+# ============ HANDLERS WITH BUTTONS ============
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "✨ <b>🏆 BIGO LIVE ASIA - PREMIUM SPORTS 🏆</b> ✨\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "👋 Welcome to the Most Beautiful Live Sports Bot!\n\n"
-        "📱 <b>COMMANDS:</b>\n"
-        "🔴 /live - All Live Matches\n"
-        "✅ /results - Previous Results\n"
-        "⚽ /football - Football\n"
-        "🏏 /cricket - Cricket\n"
-        "🏀 /basketball - Basketball\n"
-        "🎾 /tennis - Tennis\n"
-        "🏑 /hockey - Hockey\n"
-        "🏐 /volleyball - Volleyball\n"
-        "🏓 /tabletennis - Table Tennis\n"
-        "⚾ /baseball - Baseball\n"
-        "🏈 /nfl - NFL\n"
-        "🏸 /badminton - Badminton\n"
-        "🏆 /fifa - FIFA\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📢 Channel: @bigolive_asia",
-        parse_mode="HTML"
+        "👇 Button එකක් Click කරන්න:\n",
+        parse_mode="HTML",
+        reply_markup=get_main_keyboard()
     )
 
-async def live_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("✨ Loading Premium Live...")
+async def send_sport_to_chat(chat_id, context, key):
+    txt = format_full(key)
+    await context.bot.send_message(chat_id=chat_id, text=txt[:4000], parse_mode="HTML", reply_markup=get_back_keyboard(key))
+
+async def send_live_to_chat(chat_id, context):
+    msg = await context.bot.send_message(chat_id=chat_id, text="✨ Loading Premium Live...")
     text = "✨ <b>🔴 TOP 10 LIVE - PREMIUM</b> ✨\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
     for key in SPORT_CONFIG.keys():
         title, live, up, res = get_data(key)
@@ -317,23 +305,46 @@ async def live_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text += "".join(live[:1])
         else:
             text += "😴 No Live Now\n━━━━━━━━━━━━━━━━━━━━━━\n"
-    await msg.edit_text(text[:4000], parse_mode="HTML")
+    await context.bot.edit_message_text(chat_id=chat_id, message_id=msg.message_id, text=text[:4000], parse_mode="HTML", reply_markup=get_back_keyboard("live"))
 
-async def results_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("✨ Loading Results...")
+async def send_results_to_chat(chat_id, context):
+    msg = await context.bot.send_message(chat_id=chat_id, text="✨ Loading Results...")
     text = "✨ <b>✅ PREVIOUS RESULTS - PREMIUM</b> ✨\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
     for key in SPORT_CONFIG.keys():
         title, live, up, res = get_data(key)
         text += f"<b>{title}</b>\n"
         text += "".join(res[:1]) if res else "No Results\n━━━━━━━━━━━━━━━━━━━━━━\n"
-    await msg.edit_text(text[:4000], parse_mode="HTML")
+    await context.bot.edit_message_text(chat_id=chat_id, message_id=msg.message_id, text=text[:4000], parse_mode="HTML", reply_markup=get_back_keyboard("results"))
+
+async def live_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_live_to_chat(update.effective_chat.id, context)
+
+async def results_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_results_to_chat(update.effective_chat.id, context)
 
 async def make_handler(key):
     async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        msg = await update.message.reply_text("✨ Loading Premium Details...")
-        txt = format_full(key)
-        await msg.edit_text(txt[:4000], parse_mode="HTML")
+        await send_sport_to_chat(update.effective_chat.id, context, key)
     return handler
+
+# --- THIS IS THE BUTTON FIX ---
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer("Loading... ⏳")
+    data = q.data
+    print(f"Button Clicked: {data}")
+    chat_id = update.effective_chat.id
+
+    if data == "menu_start":
+        await context.bot.send_message(chat_id=chat_id, text="✨ <b>🏆 BIGO LIVE ASIA - PREMIUM SPORTS 🏆</b> ✨\n\n👇 Button එකක් Click කරන්න:", parse_mode="HTML", reply_markup=get_main_keyboard())
+    elif data == "menu_live":
+        await send_live_to_chat(chat_id, context)
+    elif data == "menu_results":
+        await send_results_to_chat(chat_id, context)
+    elif data.startswith("menu_"):
+        key = data.replace("menu_", "")
+        if key in SPORT_CONFIG:
+            await send_sport_to_chat(chat_id, context, key)
 
 last = set()
 async def auto_job(context: ContextTypes.DEFAULT_TYPE):
@@ -363,6 +374,8 @@ async def main():
     for key in SPORT_CONFIG.keys():
         h = await make_handler(key)
         app.add_handler(CommandHandler(key, h))
+    # Button Handler - මේක අනිවාර්යයි
+    app.add_handler(CallbackQueryHandler(button_handler))
     app.job_queue.run_repeating(auto_job, interval=120, first=10)
     print("Premium Bot Started!")
     await app.initialize()
