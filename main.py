@@ -9,26 +9,19 @@ from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQuer
 TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL = os.getenv("CHANNEL_ID")
 
-# ============ FLASK - UPTIMEROBOT ============
 app_flask = Flask(__name__)
-
 @app_flask.route('/')
 def home():
     return "Premium Sports Bot Running!"
-
 @app_flask.route('/ping')
 def ping():
     return "OK", 200
-
 @app_flask.route('/health')
 def health():
     return "Bot is Alive", 200
-
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app_flask.run(host="0.0.0.0", port=port, threaded=True, use_reloader=False)
-
-# ============ HELPERS ============
 
 def bar(v1, v2, label):
     try:
@@ -84,6 +77,7 @@ def get_back_keyboard(key):
         [InlineKeyboardButton("Join Channel", url="https://t.me/bigolive_asia")]
     ])
 
+# ============ UNIVERSAL FORMATTER FOR ALL 10 SPORTS ============
 def format_premium(ev, sport, league):
     try:
         comp = ev['competitions'][0]
@@ -95,7 +89,7 @@ def format_premium(ev, sport, league):
         venue = comp.get('venue', {}).get('fullName','Unknown Stadium') if comp.get('venue') else 'Unknown Stadium'
         city = comp.get('venue', {}).get('address', {}).get('city','') if comp.get('venue') else ''
         comp_name = ev.get('season', {}).get('slug','').replace('-',' ').upper() if ev.get('season') else league.upper()
-        league_emoji = {"ENG.1":"🏴󐁧󐁢󐁥󐁮󐁧󐁿","ESP.1":"🇪🇸","GER.1":"🇩🇪","ITA.1":"🇮🇹","FRA.1":"🇫🇷","UEFA.CHAMPIONS":"⭐"}.get(league.upper(),"🏆")
+        league_emoji = {"ENG.1":"🏴󐁧󐁢󐁥󐁮󐁧󐁿","ESP.1":"🇪🇸","GER.1":"🇩🇪","ITA.1":"🇮🇹","FRA.1":"🇫🇷","UEFA.CHAMPIONS":"⭐","NBA":"🏀","ATP":"🎾","WTA":"🎾","MLB":"⚾","NFL":"🏈","BWF":"🏸"}.get(league.upper(),"🏆")
 
         h = competitors[0]
         a = competitors[1] if len(competitors)>1 else None
@@ -105,14 +99,24 @@ def format_premium(ev, sport, league):
         a_short = a['team'].get('abbreviation','') if a else ""
         h_score = h.get('score','0')
         a_score = a.get('score','0') if a else "0"
+
+        # Cricket special score lines - ex: 180/4 (20 Overs)
+        h_lines = h.get('linescores', [])
+        a_lines = a.get('linescores', []) if a else []
+        h_line_txt = " | ".join([str(x.get('value','')) for x in h_lines]) if h_lines else ""
+        a_line_txt = " | ".join([str(x.get('value','')) for x in a_lines]) if a_lines else ""
+
         winner = ""
         if state == 'post':
-            if h_score > a_score:
-                winner = f"👑 {h_name} Won!"
-            elif a_score > h_score:
-                winner = f"👑 {a_name} Won!"
-            else:
-                winner = "🤝 Draw Match"
+            try:
+                if float(h_score) > float(a_score):
+                    winner = f"👑 {h_name} Won!"
+                elif float(a_score) > float(h_score):
+                    winner = f"👑 {a_name} Won!"
+                else:
+                    winner = "🤝 Draw Match"
+            except:
+                winner = f"✅ Full Time"
 
         t = ""
         t += "╔══════════════════════╗\n"
@@ -125,7 +129,7 @@ def format_premium(ev, sport, league):
         t += "╚══════════════════════╝\n\n"
         t += f"{league_emoji} <b>{comp_name}</b>\n"
         t += f"🏟️ {venue} {city}\n"
-        if state == 'in':
+        if state == 'in' and sport == "soccer":
             t += f"⏱️ Match Progress: {progress_bar(short)}\n"
         t += "\n"
         t += "┏━━━━━━━━━━━━━━━━━━━━┓\n"
@@ -137,6 +141,10 @@ def format_premium(ev, sport, league):
             t += f"┃  <b>{h_name}</b>  [{h_short}]\n"
             t += f"┃      <b> {h_score}  -  {a_score} </b>\n"
             t += f"┃  <b>{a_name}</b>  [{a_short}]\n"
+            if h_line_txt:
+                t += f"┃  {h_short}: {h_line_txt}\n"
+            if a_line_txt:
+                t += f"┃  {a_short}: {a_line_txt}\n"
         t += "┗━━━━━━━━━━━━━━━━━━━━┛\n"
         if winner:
             t += f"\n{winner}\n"
@@ -145,6 +153,18 @@ def format_premium(ev, sport, league):
             t += "━━━━━━━━━━━━━━━━━━━━━━\n"
             return t
 
+        # Cricket Extra Details
+        if sport == "cricket":
+            t += f"\n🏏 <b>CRICKET DETAILS</b>\n"
+            t += "──────────────────────\n"
+            t += f"📍 {detail}\n"
+            t += f"📊 {h_name}: {h_score}\n"
+            t += f"📊 {a_name}: {a_score}\n"
+            t += f"\n━━━━━━━━━━━━━━━━━━━━━━\n"
+            t += "💬 <i>Follow for more live updates</i>  •  @bigolive_asia\n"
+            return t
+
+        # Football / Others Details
         dj = fetch_summary(sport, league, eid)
         goals, cards, subs, timeline = [], [], [], []
         stats = {}
@@ -167,13 +187,15 @@ def format_premium(ev, sport, league):
                     timeline.append(f"  {clock}'  🟥 {ath}")
                 elif 'substitution' in tl:
                     subs.append(f"  {clock}'  🔄 {ath} ({team})")
+                elif 'touchdown' in tl or 'field goal' in tl or 'home run' in tl or 'three point' in tl:
+                    timeline.append(f"  {clock}'  🔥 {ath} - {txt} ({team})")
             try:
                 teams = dj.get('boxscore', {}).get('teams', [])
                 if len(teams) >= 2:
                     for tm in teams:
                         for st in tm.get('statistics', []):
                             n = st.get('name')
-                            if n in ['possessionPct','totalShots','shotsOnTarget','wonCorners','fouls','offsides','saves']:
+                            if n in ['possessionPct','totalShots','shotsOnTarget','wonCorners','fouls','offsides','saves','fieldGoalsMade','threePointFieldGoalsMade','rebounds','assists']:
                                 if n not in stats:
                                     stats[n] = []
                                 stats[n].append(st.get('displayValue'))
@@ -211,6 +233,8 @@ def format_premium(ev, sport, league):
                 'shotsOnTarget': f"🎯 Shots on Target",
                 'wonCorners': f"🚩 Corners",
                 'fouls': f"🚨 Fouls",
+                'rebounds': f"🏀 Rebounds",
+                'assists': f"🎯 Assists",
             }
             for k, lab in labels.items():
                 if k in stats and len(stats[k])>=2:
@@ -263,7 +287,7 @@ def get_data(key):
                 events = []
             for ev in events:
                 state = ev.get('status',{}).get('type',{}).get('state')
-                txt = f"🏏 <b>{ev.get('name','')}</b>\n📍 {ev.get('status',{}).get('type',{}).get('detail','')}\n━━━━━━━━━━━━━━━━━━━━━━\n"
+                txt = format_premium(ev, "cricket", "")
                 if state=='in': live.append(txt)
                 elif state=='pre': up.append(txt)
                 elif state=='post': res.append(txt)
@@ -289,8 +313,6 @@ def format_full(key):
     t += "".join(up[:3]) if up else "No Upcoming\n━━━━━━━━━━━━━━━━━━━━━━\n"
     return t
 
-# ============ HANDLERS ============
-
 WELCOME_TEXT = (
     "✨ 🏆 YADANAR LIVE SPORTS - PREMIUM SPORTS 🏆 ✨\n"
     "━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -299,11 +321,7 @@ WELCOME_TEXT = (
 )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        WELCOME_TEXT,
-        parse_mode="HTML",
-        reply_markup=get_main_keyboard()
-    )
+    await update.message.reply_text(WELCOME_TEXT, parse_mode="HTML", reply_markup=get_main_keyboard())
 
 async def send_sport_to_chat(chat_id, context, key):
     txt = format_full(key)
@@ -332,10 +350,8 @@ async def send_results_to_chat(chat_id, context):
 
 async def live_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_live_to_chat(update.effective_chat.id, context)
-
 async def results_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_results_to_chat(update.effective_chat.id, context)
-
 async def make_handler(key):
     async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_sport_to_chat(update.effective_chat.id, context, key)
@@ -358,7 +374,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if key in SPORT_CONFIG:
             await send_sport_to_chat(chat_id, context, key)
 
-# ============ AUTO POST EVERY 3 MINUTES ============
 async def auto_job(context: ContextTypes.DEFAULT_TYPE):
     try:
         if not CHANNEL:
