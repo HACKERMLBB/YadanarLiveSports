@@ -7,7 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 
 TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL = os.getenv("CHANNEL_ID")
+CHANNEL_IDS = [x.strip() for x in os.getenv("CHANNEL_IDS", "").split(",") if x.strip()]
 
 app_flask = Flask(__name__)
 @app_flask.route('/')
@@ -58,15 +58,27 @@ def fetch_summary(sport, league, eid):
     except:
         return None
 
+def fetch_standings(sport, league):
+    try:
+        url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/standings"
+        return requests.get(url, timeout=12).json()
+    except:
+        return None
+
 def get_main_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("Football", callback_data="menu_football"), InlineKeyboardButton("Cricket", callback_data="menu_cricket")],
+        [InlineKeyboardButton("IPL LIVE", callback_data="menu_ipl"), InlineKeyboardButton("LPL / SL", callback_data="menu_lpl")],
         [InlineKeyboardButton("Basketball", callback_data="menu_basketball"), InlineKeyboardButton("Tennis", callback_data="menu_tennis")],
         [InlineKeyboardButton("Hockey", callback_data="menu_hockey"), InlineKeyboardButton("Volleyball", callback_data="menu_volleyball")],
         [InlineKeyboardButton("Table Tennis", callback_data="menu_tabletennis"), InlineKeyboardButton("Baseball", callback_data="menu_baseball")],
         [InlineKeyboardButton("NFL", callback_data="menu_nfl"), InlineKeyboardButton("Badminton", callback_data="menu_badminton")],
+        [InlineKeyboardButton("F1 Racing", callback_data="menu_f1"), InlineKeyboardButton("Golf", callback_data="menu_golf")],
+        [InlineKeyboardButton("UFC / Boxing", callback_data="menu_ufc"), InlineKeyboardButton("Rugby", callback_data="menu_rugby")],
+        [InlineKeyboardButton("Kabaddi", callback_data="menu_kabaddi"), InlineKeyboardButton("E-Sports", callback_data="menu_esports")],
         [InlineKeyboardButton("FIFA", callback_data="menu_fifa"), InlineKeyboardButton("LIVE ALL", callback_data="menu_live")],
-        [InlineKeyboardButton("RESULTS", callback_data="menu_results")],
+        [InlineKeyboardButton("RESULTS", callback_data="menu_results"), InlineKeyboardButton("POINTS TABLE", callback_data="menu_table")],
+        [InlineKeyboardButton("TOMORROW", callback_data="menu_tomorrow"), InlineKeyboardButton("SEARCH", callback_data="menu_search")],
         [InlineKeyboardButton("Join Channel", url="https://t.me/bigolive_asia")]
     ])
 
@@ -77,7 +89,6 @@ def get_back_keyboard(key):
         [InlineKeyboardButton("Join Channel", url="https://t.me/bigolive_asia")]
     ])
 
-# ============ UNIVERSAL FORMATTER FOR ALL 10 SPORTS ============
 def format_premium(ev, sport, league):
     try:
         comp = ev['competitions'][0]
@@ -89,8 +100,7 @@ def format_premium(ev, sport, league):
         venue = comp.get('venue', {}).get('fullName','Unknown Stadium') if comp.get('venue') else 'Unknown Stadium'
         city = comp.get('venue', {}).get('address', {}).get('city','') if comp.get('venue') else ''
         comp_name = ev.get('season', {}).get('slug','').replace('-',' ').upper() if ev.get('season') else league.upper()
-        league_emoji = {"ENG.1":"🏴󐁧󐁢󐁥󐁮󐁧󐁿","ESP.1":"🇪🇸","GER.1":"🇩🇪","ITA.1":"🇮🇹","FRA.1":"🇫🇷","UEFA.CHAMPIONS":"⭐","NBA":"🏀","ATP":"🎾","WTA":"🎾","MLB":"⚾","NFL":"🏈","BWF":"🏸"}.get(league.upper(),"🏆")
-
+        league_emoji = {"ENG.1":"🏴󐁧󐁢󐁥󐁮󐁧󐁿","ESP.1":"🇪🇸","GER.1":"🇩🇪","ITA.1":"🇮🇹","FRA.1":"🇫🇷","UEFA.CHAMPIONS":"⭐","NBA":"🏀","ATP":"🎾","WTA":"🎾","MLB":"⚾","NFL":"🏈","BWF":"🏸","F1":"🏎️","PGA":"⛳","MMA":"🥊","RUGBY":"🏉"}.get(league.upper(),"🏆")
         h = competitors[0]
         a = competitors[1] if len(competitors)>1 else None
         h_name = h['team'].get('displayName','')
@@ -99,13 +109,10 @@ def format_premium(ev, sport, league):
         a_short = a['team'].get('abbreviation','') if a else ""
         h_score = h.get('score','0')
         a_score = a.get('score','0') if a else "0"
-
-        # Cricket special score lines - ex: 180/4 (20 Overs)
         h_lines = h.get('linescores', [])
         a_lines = a.get('linescores', []) if a else []
         h_line_txt = " | ".join([str(x.get('value','')) for x in h_lines]) if h_lines else ""
         a_line_txt = " | ".join([str(x.get('value','')) for x in a_lines]) if a_lines else ""
-
         winner = ""
         if state == 'post':
             try:
@@ -116,8 +123,7 @@ def format_premium(ev, sport, league):
                 else:
                     winner = "🤝 Draw Match"
             except:
-                winner = f"✅ Full Time"
-
+                winner = "✅ Full Time"
         t = ""
         t += "╔══════════════════════╗\n"
         if state == 'in':
@@ -134,13 +140,9 @@ def format_premium(ev, sport, league):
         t += "\n"
         t += "┏━━━━━━━━━━━━━━━━━━━━┓\n"
         if state == 'pre':
-            t += f"┃  <b>{h_name}</b>\n"
-            t += f"┃         <b>VS</b>\n"
-            t += f"┃  <b>{a_name}</b>\n"
+            t += f"┃  <b>{h_name}</b>\n┃         <b>VS</b>\n┃  <b>{a_name}</b>\n"
         else:
-            t += f"┃  <b>{h_name}</b>  [{h_short}]\n"
-            t += f"┃      <b> {h_score}  -  {a_score} </b>\n"
-            t += f"┃  <b>{a_name}</b>  [{a_short}]\n"
+            t += f"┃  <b>{h_name}</b>  [{h_short}]\n┃      <b> {h_score}  -  {a_score} </b>\n┃  <b>{a_name}</b>  [{a_short}]\n"
             if h_line_txt:
                 t += f"┃  {h_short}: {h_line_txt}\n"
             if a_line_txt:
@@ -149,22 +151,11 @@ def format_premium(ev, sport, league):
         if winner:
             t += f"\n{winner}\n"
         if state == 'pre':
-            t += "\n<i>⏳ Match not started yet. Stay tuned!</i>\n"
-            t += "━━━━━━━━━━━━━━━━━━━━━━\n"
+            t += "\n<i>⏳ Match not started yet. Stay tuned!</i>\n━━━━━━━━━━━━━━━━━━━━━━\n"
             return t
-
-        # Cricket Extra Details
         if sport == "cricket":
-            t += f"\n🏏 <b>CRICKET DETAILS</b>\n"
-            t += "──────────────────────\n"
-            t += f"📍 {detail}\n"
-            t += f"📊 {h_name}: {h_score}\n"
-            t += f"📊 {a_name}: {a_score}\n"
-            t += f"\n━━━━━━━━━━━━━━━━━━━━━━\n"
-            t += "💬 <i>Follow for more live updates</i>  •  @bigolive_asia\n"
+            t += f"\n🏏 <b>CRICKET DETAILS</b>\n──────────────────────\n📍 {detail}\n📊 {h_name}: {h_score}\n📊 {a_name}: {a_score}\n\n━━━━━━━━━━━━━━━━━━━━━━\n💬 <i>Follow for more live updates</i>  •  @bigolive_asia\n"
             return t
-
-        # Football / Others Details
         dj = fetch_summary(sport, league, eid)
         goals, cards, subs, timeline = [], [], [], []
         stats = {}
@@ -187,7 +178,7 @@ def format_premium(ev, sport, league):
                     timeline.append(f"  {clock}'  🟥 {ath}")
                 elif 'substitution' in tl:
                     subs.append(f"  {clock}'  🔄 {ath} ({team})")
-                elif 'touchdown' in tl or 'field goal' in tl or 'home run' in tl or 'three point' in tl:
+                elif 'touchdown' in tl or 'field goal' in tl or 'home run' in tl:
                     timeline.append(f"  {clock}'  🔥 {ath} - {txt} ({team})")
             try:
                 teams = dj.get('boxscore', {}).get('teams', [])
@@ -195,47 +186,32 @@ def format_premium(ev, sport, league):
                     for tm in teams:
                         for st in tm.get('statistics', []):
                             n = st.get('name')
-                            if n in ['possessionPct','totalShots','shotsOnTarget','wonCorners','fouls','offsides','saves','fieldGoalsMade','threePointFieldGoalsMade','rebounds','assists']:
+                            if n in ['possessionPct','totalShots','shotsOnTarget','wonCorners','fouls','offsides','saves','rebounds','assists']:
                                 if n not in stats:
                                     stats[n] = []
                                 stats[n].append(st.get('displayValue'))
             except:
                 pass
-
         if timeline:
-            t += f"\n📜 <b>MATCH TIMELINE</b>\n"
-            t += "──────────────────────\n"
+            t += f"\n📜 <b>MATCH TIMELINE</b>\n──────────────────────\n"
             for line in timeline:
                 t += f"{line}\n"
         if goals:
-            t += f"\n⚽ <b>GOAL SCORERS</b>\n"
-            t += "──────────────────────\n"
+            t += f"\n⚽ <b>GOAL SCORERS</b>\n──────────────────────\n"
             for clock, ath, team, is_pen in goals:
                 pen = " 🎯 PENALTY" if is_pen else ""
-                t += f"  ⏰ {clock}'  <b>{ath}</b>\n"
-                t += f"       └ {team}{pen}\n"
+                t += f"  ⏰ {clock}'  <b>{ath}</b>\n       └ {team}{pen}\n"
         if cards:
-            t += f"\n🟨 <b>CARDS</b>\n"
-            t += "──────────────────────\n"
+            t += f"\n🟨 <b>CARDS</b>\n──────────────────────\n"
             for c in cards:
                 t += f"{c}\n"
         if subs:
-            t += f"\n🔄 <b>SUBSTITUTIONS</b>\n"
-            t += "──────────────────────\n"
+            t += f"\n🔄 <b>SUBSTITUTIONS</b>\n──────────────────────\n"
             for s in subs[:5]:
                 t += f"{s}\n"
         if stats:
-            t += f"\n📊 <b>MATCH STATISTICS</b>\n"
-            t += "──────────────────────\n"
-            labels = {
-                'possessionPct': f"⚽ Possession  {h_short} vs {a_short}",
-                'totalShots': f"🥅 Total Shots  {h_short} vs {a_short}",
-                'shotsOnTarget': f"🎯 Shots on Target",
-                'wonCorners': f"🚩 Corners",
-                'fouls': f"🚨 Fouls",
-                'rebounds': f"🏀 Rebounds",
-                'assists': f"🎯 Assists",
-            }
+            t += f"\n📊 <b>MATCH STATISTICS</b>\n──────────────────────\n"
+            labels = {'possessionPct': f"⚽ Possession  {h_short} vs {a_short}",'totalShots': f"🥅 Total Shots  {h_short} vs {a_short}",'shotsOnTarget': f"🎯 Shots on Target",'wonCorners': f"🚩 Corners",'fouls': f"🚨 Fouls",'rebounds': f"🏀 Rebounds",'assists': f"🎯 Assists"}
             for k, lab in labels.items():
                 if k in stats and len(stats[k])>=2:
                     v1, v2 = stats[k][0], stats[k][1]
@@ -243,8 +219,7 @@ def format_premium(ev, sport, league):
                         t += bar(v1, v2, lab) + "\n"
                     else:
                         try:
-                            a1 = float(v1); b1 = float(v2)
-                            tot = a1+b1
+                            a1 = float(v1); b1 = float(v2); tot = a1+b1
                             if tot>0:
                                 p = int((a1/tot)*10)
                                 t += f"{lab}\n{'🟦'*p}{'🟧'*(10-p)}  {v1} - {v2}\n\n"
@@ -255,8 +230,7 @@ def format_premium(ev, sport, league):
         else:
             if state == 'in':
                 t += f"\n📊 <i>Stats are updating live...</i>\n"
-        t += "\n━━━━━━━━━━━━━━━━━━━━━━\n"
-        t += "💬 <i>Follow for more live updates</i>  •  @bigolive_asia\n"
+        t += "\n━━━━━━━━━━━━━━━━━━━━━━\n💬 <i>Follow for more live updates</i>  •  @bigolive_asia\n"
         return t
     except Exception as e:
         return f"Error: {e}\n━━━━━━━━━━━━━━\n"
@@ -264,6 +238,8 @@ def format_premium(ev, sport, league):
 SPORT_CONFIG = {
     "football": ("⚽ FOOTBALL", [("soccer","eng.1"),("soccer","esp.1"),("soccer","ger.1"),("soccer","ita.1"),("soccer","fra.1"),("soccer","uefa.champions")]),
     "cricket": ("🏏 CRICKET", [("cricket","")]),
+    "ipl": ("🔥 IPL - INDIAN PREMIER LEAGUE", [("cricket","")]),
+    "lpl": ("🇱🇰 LPL / SRI LANKA", [("cricket","")]),
     "basketball": ("🏀 BASKETBALL", [("basketball","nba")]),
     "tennis": ("🎾 TENNIS", [("tennis","atp"),("tennis","wta")]),
     "hockey": ("🏑 FIELD HOCKEY", [("field-hockey","fih")]),
@@ -273,6 +249,12 @@ SPORT_CONFIG = {
     "nfl": ("🏈 AMERICAN FOOTBALL", [("football","nfl")]),
     "badminton": ("🏸 BADMINTON", [("badminton","bwf")]),
     "fifa": ("🏆 FIFA", [("soccer","fifa.world"),("soccer","fifa.friendly")]),
+    "f1": ("🏎️ FORMULA 1", [("racing","f1")]),
+    "golf": ("⛳ GOLF", [("golf","pga")]),
+    "ufc": ("🥊 UFC / MMA / BOXING", [("mma","mma"),("boxing","boxing")]),
+    "rugby": ("🏉 RUGBY", [("rugby","rugby")]),
+    "kabaddi": ("🤼 KABADDI", [("cricket","")]),
+    "esports": ("🎮 E-SPORTS", [("soccer","eng.1")]),
 }
 
 def get_data(key):
@@ -286,6 +268,13 @@ def get_data(key):
             except:
                 events = []
             for ev in events:
+                name = ev.get('name','').lower()
+                if key == "ipl" and "ipl" not in name and "indian premier" not in name:
+                    continue
+                if key == "lpl" and "lanka" not in name and "sri lanka" not in name and "lpl" not in name:
+                    continue
+                if key == "kabaddi":
+                    continue
                 state = ev.get('status',{}).get('type',{}).get('state')
                 txt = format_premium(ev, "cricket", "")
                 if state=='in': live.append(txt)
@@ -299,12 +288,15 @@ def get_data(key):
             if state=='in': live.append(txt)
             elif state=='pre': up.append(txt)
             elif state=='post': res.append(txt)
+    if key == "kabaddi":
+        live = ["🤼 <b>PRO KABADDI LEAGUE</b>\n\n📍 Live Score Coming Soon\n🏆 Season Starts Soon - Stay Tuned!\n━━━━━━━━━━━━━━━━━━━━━━\n"]
+    if key == "esports":
+        live = ["🎮 <b>E-SPORTS LIVE</b>\n\n🔥 PUBG Mobile - PMPL\n🔥 Free Fire - FFWS\n🔥 Valorant Champions\n\n📍 Live Scores Update Soon\n━━━━━━━━━━━━━━━━━━━━━━\n"]
     return title, live, up, res
 
 def format_full(key):
     title, live, up, res = get_data(key)
-    t = f"✨ <b>{title}  •  PREMIUM LIVE</b> ✨\n"
-    t += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    t = f"✨ <b>{title}  •  PREMIUM LIVE</b> ✨\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
     t += "🔴 <b>LIVE NOW</b>\n\n"
     t += "".join(live[:2]) if live else "😴 No Live Match Right Now\n━━━━━━━━━━━━━━━━━━━━━━\n"
     t += "\n✅ <b>PREVIOUS RESULTS</b>\n\n"
@@ -314,10 +306,27 @@ def format_full(key):
     return t
 
 WELCOME_TEXT = (
-    "✨ 🏆 YADANAR LIVE SPORTS - PREMIUM SPORTS 🏆 ✨\n"
+    "╔══════════════════════╗\n"
+    "║  ✨ 🏆 PREMIUM SPORTS 🏆 ✨  ║\n"
+    "╚══════════════════════╝\n\n"
+    "    ⚽  🏏  🏀  🎾  🏈  ⚾\n"
+    "  <b>YADANAR LIVE SPORTS</b>\n"
+    "  <b>PREMIUM SPORTS</b>\n\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "👋 <b>Welcome, Champion!</b>\n"
     "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    "👋 Welcome to the Most Beautiful Live Sports Bot!\n\n"
-    "POWERD BY @t.me/bigolive_asia:"
+    "🔴 <b>LIVE SCORES</b>  •  Every 3 Minutes\n"
+    "⚽ <b>GOAL ALERTS</b>  •  Instant Update\n"
+    "🏆 <b>IPL • LPL • EPL • FIFA</b>\n"
+    "🏏 <b>CRICKET • FOOTBALL • TENNIS</b>\n"
+    "📊 <b>STATS • TABLE • RESULTS</b>\n\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "👇 <b>CHOOSE YOUR SPORT BELOW</b> 👇\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    "💎 <i>Fastest • Beautiful • Free</i>\n"
+    "💬 <i>Join Our Family For Daily Live Updates</i>\n\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "POWERD BY @bigolive_asia"
 )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -329,14 +338,11 @@ async def send_sport_to_chat(chat_id, context, key):
 
 async def send_live_to_chat(chat_id, context):
     msg = await context.bot.send_message(chat_id=chat_id, text="✨ Loading Premium Live...")
-    text = "✨ <b>🔴 TOP 10 LIVE - PREMIUM</b> ✨\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    text = "✨ <b>🔴 TOP LIVE - PREMIUM</b> ✨\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
     for key in SPORT_CONFIG.keys():
         title, live, up, res = get_data(key)
         text += f"<b>{title}</b>\n"
-        if live:
-            text += "".join(live[:1])
-        else:
-            text += "😴 No Live Now\n━━━━━━━━━━━━━━━━━━━━━━\n"
+        text += "".join(live[:1]) if live else "😴 No Live Now\n━━━━━━━━━━━━━━━━━━━━━━\n"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=msg.message_id, text=text[:4000], parse_mode="HTML", reply_markup=get_back_keyboard("live"))
 
 async def send_results_to_chat(chat_id, context):
@@ -348,10 +354,56 @@ async def send_results_to_chat(chat_id, context):
         text += "".join(res[:1]) if res else "No Results\n━━━━━━━━━━━━━━━━━━━━━━\n"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=msg.message_id, text=text[:4000], parse_mode="HTML", reply_markup=get_back_keyboard("results"))
 
+async def send_table_to_chat(chat_id, context):
+    txt = "🏆 <b>PREMIER LEAGUE - POINTS TABLE</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    data = fetch_standings("soccer","eng.1")
+    try:
+        entries = data['children'][0]['standings']['entries'][:10]
+        for i, e in enumerate(entries, 1):
+            team = e['team']['displayName']
+            stats = {s['name']: s['value'] for s in e['stats']}
+            txt += f"{i}. <b>{team}</b> - {stats.get('points',0)} Pts | P:{stats.get('gamesPlayed',0)} W:{stats.get('wins',0)} D:{stats.get('ties',0)} L:{stats.get('losses',0)}\n"
+    except:
+        txt += "Table Updating... Try Again Later\n"
+    txt += "\n━━━━━━━━━━━━━━━━━━━━━━\n💬 @bigolive_asia"
+    await context.bot.send_message(chat_id=chat_id, text=txt[:4000], parse_mode="HTML", reply_markup=get_back_keyboard("table"))
+
+async def send_tomorrow_to_chat(chat_id, context):
+    txt = "📅 <b>TOMORROW MATCHES</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    for key in ["football","cricket","basketball","tennis"]:
+        title, live, up, res = get_data(key)
+        txt += f"<b>{title}</b>\n"
+        txt += "".join(up[:2]) if up else "No Matches Tomorrow\n━━━━━━━━━━━━━━━━━━━━━━\n"
+    await context.bot.send_message(chat_id=chat_id, text=txt[:4000], parse_mode="HTML", reply_markup=get_back_keyboard("tomorrow"))
+
+async def search_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("🔍 Usage: /search Real Madrid\nExample: /search India\nExample: /search Arsenal", parse_mode="HTML")
+        return
+    q = " ".join(context.args).lower()
+    await update.message.reply_text(f"🔍 Searching for <b>{q}</b>...", parse_mode="HTML")
+    found = False
+    for key in SPORT_CONFIG.keys():
+        title, live, up, res = get_data(key)
+        for item in live + up + res:
+            if q in item.lower():
+                await update.message.reply_text(item[:4000], parse_mode="HTML")
+                found = True
+                break
+        if found:
+            break
+    if not found:
+        await update.message.reply_text("😴 No Match Found. Try Another Team Name.", parse_mode="HTML")
+
 async def live_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_live_to_chat(update.effective_chat.id, context)
 async def results_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_results_to_chat(update.effective_chat.id, context)
+async def table_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_table_to_chat(update.effective_chat.id, context)
+async def tomorrow_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_tomorrow_to_chat(update.effective_chat.id, context)
+
 async def make_handler(key):
     async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_sport_to_chat(update.effective_chat.id, context, key)
@@ -361,7 +413,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer("Loading... ⏳")
     data = q.data
-    print(f"Button Clicked: {data}")
     chat_id = update.effective_chat.id
     if data == "menu_start":
         await context.bot.send_message(chat_id=chat_id, text=WELCOME_TEXT, parse_mode="HTML", reply_markup=get_main_keyboard())
@@ -369,20 +420,39 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_live_to_chat(chat_id, context)
     elif data == "menu_results":
         await send_results_to_chat(chat_id, context)
+    elif data == "menu_table":
+        await send_table_to_chat(chat_id, context)
+    elif data == "menu_tomorrow":
+        await send_tomorrow_to_chat(chat_id, context)
+    elif data == "menu_search":
+        await context.bot.send_message(chat_id=chat_id, text="🔍 <b>SEARCH</b>\n\nType: /search Real Madrid\nType: /search India\nType: /search Arsenal", parse_mode="HTML")
     elif data.startswith("menu_"):
         key = data.replace("menu_", "")
         if key in SPORT_CONFIG:
             await send_sport_to_chat(chat_id, context, key)
 
+last_goals = {}
 async def auto_job(context: ContextTypes.DEFAULT_TYPE):
+    global last_goals
     try:
-        if not CHANNEL:
+        if not CHANNEL_IDS:
             return
         for key in SPORT_CONFIG.keys():
             title, live, _, _ = get_data(key)
             if live:
                 text = f"✨ <b>🔴 LIVE UPDATE - {title}</b> ✨\n\n{live[0]}"[:4000]
-                await context.bot.send_message(chat_id=CHANNEL, text=text, parse_mode="HTML")
+                for CH in CHANNEL_IDS:
+                    try:
+                        await context.bot.send_message(chat_id=CH, text=text, parse_mode="HTML")
+                    except Exception as e:
+                        print(f"Send Fail {CH}:", e)
+                if "⚽" in live[0] and key not in last_goals:
+                    last_goals[key] = live[0]
+                    for CH in CHANNEL_IDS:
+                        try:
+                            await context.bot.send_message(chat_id=CH, text=f"⚽⚽ <b>GOAL ALERT - {title}</b> ⚽⚽\n\nCheck Live Score Above!", parse_mode="HTML")
+                        except:
+                            pass
                 break
     except Exception as e:
         print("Auto Error:", e)
@@ -393,6 +463,10 @@ async def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("live", live_cmd))
     app.add_handler(CommandHandler("results", results_cmd))
+    app.add_handler(CommandHandler("table", table_cmd))
+    app.add_handler(CommandHandler("tomorrow", tomorrow_cmd))
+    app.add_handler(CommandHandler("search", search_cmd))
+    app.add_handler(CommandHandler("lineup", search_cmd))
     for key in SPORT_CONFIG.keys():
         h = await make_handler(key)
         app.add_handler(CommandHandler(key, h))
