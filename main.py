@@ -23,6 +23,60 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app_flask.run(host="0.0.0.0", port=port, threaded=True, use_reloader=False)
 
+# ========== ALL WORLD LANGUAGES ==========
+USER_LANG = {}
+LANGS = {
+    "si": {"name": "සිංහල", "welcome": "👋 ආයුබෝවන්! ඔබේ ක්‍රීඩාව තෝරන්න", "choose": "👇 ඔබේ ක්‍රීඩාව තෝරන්න 👇", "live": "🔴 සජීවී", "results": "✅ ප්‍රතිඵල"},
+    "ta": {"name": "தமிழ்", "welcome": "👋 வணக்கம்! உங்கள் விளையாட்டை தேர்வு செய்யவும்", "choose": "👇 உங்கள் விளையாட்டை தேர்வு செய்யவும் 👇", "live": "🔴 நேரலை", "results": "✅ முடிவுகள்"},
+    "en": {"name": "English", "welcome": "👋 Welcome, Champion!", "choose": "👇 CHOOSE YOUR SPORT BELOW 👇", "live": "🔴 LIVE NOW", "results": "✅ RESULTS"},
+    "hi": {"name": "हिन्दी", "welcome": "👋 नमस्ते! अपना खेल चुनें", "choose": "👇 अपना खेल चुनें 👇", "live": "🔴 लाइव", "results": "✅ परिणाम"},
+    "ur": {"name": "اردو", "welcome": "👋 خوش آمدید! اپنا کھیل منتخب کریں", "choose": "👇 اپنا کھیل منتخب کریں 👇", "live": "🔴 لائیو", "results": "✅ نتائج"},
+    "bn": {"name": "বাংলা", "welcome": "👋 স্বাগতম! আপনার খেলা বেছে নিন", "choose": "👇 আপনার খেলা বেছে নিন 👇", "live": "🔴 লাইভ", "results": "✅ ফলাফল"},
+    "ar": {"name": "العربية", "welcome": "👋 مرحبا! اختر رياضتك", "choose": "👇 اختر رياضتك 👇", "live": "🔴 مباشر", "results": "✅ النتائج"},
+    "es": {"name": "Español", "welcome": "👋 ¡Bienvenido, Campeón!", "choose": "👇 ELIGE TU DEPORTE 👇", "live": "🔴 EN VIVO", "results": "✅ RESULTADOS"},
+    "fr": {"name": "Français", "welcome": "👋 Bienvenue, Champion!", "choose": "👇 CHOISISSEZ VOTRE SPORT 👇", "live": "🔴 EN DIRECT", "results": "✅ RÉSULTATS"},
+    "pt": {"name": "Português", "welcome": "👋 Bem-vindo, Campeão!", "choose": "👇 ESCOLHA SEU ESPORTE 👇", "live": "🔴 AO VIVO", "results": "✅ RESULTADOS"},
+    "ru": {"name": "Русский", "welcome": "👋 Добро пожаловать, Чемпион!", "choose": "👇 ВЫБЕРИТЕ СВОЙ СПОРТ 👇", "live": "🔴 В ПРЯМОМ ЭФИРЕ", "results": "✅ РЕЗУЛЬТАТЫ"},
+    "zh": {"name": "中文", "welcome": "👋 欢迎，冠军！", "choose": "👇 选择你的运动 👇", "live": "🔴 直播", "results": "✅ 成绩"},
+    "ja": {"name": "日本語", "welcome": "👋 ようこそ、チャンピオン！", "choose": "👇 スポーツを選んでください 👇", "live": "🔴 ライブ", "results": "✅ 結果"},
+    "ko": {"name": "한국어", "welcome": "👋 환영합니다, 챔피언!", "choose": "👇 스포츠를 선택하세요 👇", "live": "🔴 라이브", "results": "✅ 결과"},
+    "de": {"name": "Deutsch", "welcome": "👋 Willkommen, Champion!", "choose": "👇 WÄHLE DEINEN SPORT 👇", "live": "🔴 LIVE", "results": "✅ ERGEBNISSE"},
+    "it": {"name": "Italiano", "welcome": "👋 Benvenuto, Campione!", "choose": "👇 SCEGLI IL TUO SPORT 👇", "live": "🔴 IN DIRETTA", "results": "✅ RISULTATI"},
+    "nl": {"name": "Nederlands", "welcome": "👋 Welkom, Kampioen!", "choose": "👇 KIES JE SPORT 👇", "live": "🔴 LIVE", "results": "✅ RESULTATEN"},
+    "tr": {"name": "Türkçe", "welcome": "👋 Hoş Geldin, Şampiyon!", "choose": "👇 SPORUNU SEÇ 👇", "live": "🔴 CANLI", "results": "✅ SONUÇLAR"},
+    "fa": {"name": "فارسی", "welcome": "👋 خوش آمدید، قهرمان!", "choose": "👇 ورزش خود را انتخاب کنید 👇", "live": "🔴 زنده", "results": "✅ نتایج"},
+    "ms": {"name": "Bahasa Melayu", "welcome": "👋 Selamat Datang, Juara!", "choose": "👇 PILIH SUKAN ANDA 👇", "live": "🔴 LANGSUNG", "results": "✅ KEPUTUSAN"},
+    "id": {"name": "Bahasa Indonesia", "welcome": "👋 Selamat Datang, Juara!", "choose": "👇 PILIH OLAHRAGA ANDA 👇", "live": "🔴 LANGSUNG", "results": "✅ HASIL"},
+    "th": {"name": "ไทย", "welcome": "👋 ยินดีต้อนรับ แชมป์เปี้ยน!", "choose": "👇 เลือกกีฬาของคุณ 👇", "live": "🔴 สด", "results": "✅ ผลลัพธ์"},
+    "vi": {"name": "Tiếng Việt", "welcome": "👋 Chào mừng, Nhà vô địch!", "choose": "👇 CHỌN MÔN THỂ THAO CỦA BẠN 👇", "live": "🔴 TRỰC TIẾP", "results": "✅ KẾT QUẢ"},
+    "tl": {"name": "Filipino", "welcome": "👋 Maligayang Pagdating, Kampeon!", "choose": "👇 PILIIN ANG IYONG SPORT 👇", "live": "🔴 LIVE", "results": "✅ RESULTA"},
+    "ne": {"name": "नेपाली", "welcome": "👋 नमस्ते, च्याम्पियन!", "choose": "👇 आफ्नो खेल छान्नुहोस् 👇", "live": "🔴 लाइभ", "results": "✅ नतिजा"},
+    "pa": {"name": "ਪੰਜਾਬੀ", "welcome": "👋 ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ, ਚੈਂਪੀਅਨ!", "choose": "👇 ਆਪਣੀ ਖੇਡ ਚੁਣੋ 👇", "live": "🔴 ਲਾਈਵ", "results": "✅ ਨਤੀਜੇ"},
+    "te": {"name": "తెలుగు", "welcome": "👋 స్వాగతం, ఛాంపియన్!", "choose": "👇 మీ క్రీడను ఎంచుకోండి 👇", "live": "🔴 ప్రత్యక్ష", "results": "✅ ఫలితాలు"},
+    "ml": {"name": "മലയാളം", "welcome": "👋 സ്വാഗതം, ചാമ്പ്യൻ!", "choose": "👇 നിങ്ങളുടെ കായികം തിരഞ്ഞെടുക്കുക 👇", "live": "🔴 ലൈവ്", "results": "✅ ഫലങ്ങൾ"},
+    "kn": {"name": "ಕನ್ನಡ", "welcome": "👋 ಸುಸ್ವಾಗತ, ಚಾಂಪಿಯನ್!", "choose": "👇 ನಿಮ್ಮ ಕ್ರೀಡೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ 👇", "live": "🔴 ಲೈವ್", "results": "✅ ಫಲಿತಾಂಶಗಳು"},
+    "mr": {"name": "मराठी", "welcome": "👋 नमस्कार, चॅम्पियन!", "choose": "👇 तुमचा खेळ निवडा 👇", "live": "🔴 लाईव्ह", "results": "✅ निकाल"},
+    "gu": {"name": "ગુજરાતી", "welcome": "👋 નમસ્તે, ચેમ્પિયન!", "choose": "👇 તમારી રમત પસંદ કરો 👇", "live": "🔴 લાઇવ", "results": "✅ પરિણામો"},
+    "or": {"name": "ଓଡ଼ିଆ", "welcome": "👋 ନମସ୍କାର, ଚାମ୍ପିଅନ୍!", "choose": "👇 ଆପଣଙ୍କ ଖେଳ ବାଛନ୍ତୁ 👇", "live": "🔴 ଲାଇଭ୍", "results": "✅ ଫଳାଫଳ"},
+    "my": {"name": "မြန်မာ", "welcome": "👋 ကြိုဆိုပါတယ်၊ ချန်ပီယံ!", "choose": "👇 သင့်အားကစားကို ရွေးချယ်ပါ 👇", "live": "🔴 တိုက်ရိုက်", "results": "✅ ရလဒ်များ"},
+    "km": {"name": "ខ្មែរ", "welcome": "👋 សូមស្វាគមន៍ ជើងឯក!", "choose": "👇 ជ្រើសរើសកីឡារបស់អ្នក 👇", "live": "🔴 ផ្ទាល់", "results": "✅ លទ្ធផល"},
+    "lo": {"name": "ລາວ", "welcome": "👋 ຍິນດີຕ້ອນຮັບ ແຊ້ມ!", "choose": "👇 ເລືອກກິລາຂອງທ່ານ 👇", "live": "🔴 ສົດ", "results": "✅ ຜົນໄດ້ຮັບ"},
+    "sw": {"name": "Kiswahili", "welcome": "👋 Karibu, Bingwa!", "choose": "👇 CHAGUA MICHEZO YAKO 👇", "live": "🔴 MOJA KWA MOJA", "results": "✅ MATOKEO"},
+    "ha": {"name": "Hausa", "welcome": "👋 Barka da zuwa, Zakara!", "choose": "👇 ZAƁI WASA 👇", "live": "🔴 LIVE", "results": "✅ SAKAMAKO"},
+    "am": {"name": "አማርኛ", "welcome": "👋 እንኳን ደህና መጣህ, ሻምፒዮን!", "choose": "👇 ስፖርትህን ምረጥ 👇", "live": "🔴 ቀጥታ", "results": "✅ ውጤቶች"},
+    "uk": {"name": "Українська", "welcome": "👋 Ласкаво просимо, Чемпіоне!", "choose": "👇 ОБЕРІТЬ СВІЙ СПОРТ 👇", "live": "🔴 НАЖИВО", "results": "✅ РЕЗУЛЬТАТИ"},
+    "pl": {"name": "Polski", "welcome": "👋 Witaj, Mistrzu!", "choose": "👇 WYBIERZ SWÓJ SPORT 👇", "live": "🔴 NA ŻYWO", "results": "✅ WYNIKI"},
+    "sv": {"name": "Svenska", "welcome": "👋 Välkommen, Mästare!", "choose": "👇 VÄLJ DIN SPORT 👇", "live": "🔴 LIVE", "results": "✅ RESULTAT"},
+    "fi": {"name": "Suomi", "welcome": "👋 Tervetuloa, Mestari!", "choose": "👇 VALITSE URHEILUSI 👇", "live": "🔴 LIVE", "results": "✅ TULOKSET"},
+    "el": {"name": "Ελληνικά", "welcome": "👋 Καλώς ήρθες, Πρωταθλητή!", "choose": "👇 ΔΙΑΛΕΞΕ ΤΟ ΑΘΛΗΜΑ ΣΟΥ 👇", "live": "🔴 ΖΩΝΤΑΝΑ", "results": "✅ ΑΠΟΤΕΛΕΣΜΑΤΑ"},
+    "he": {"name": "עברית", "welcome": "👋 ברוך הבא, אלוף!", "choose": "👇 בחר את הספורט שלך 👇", "live": "🔴 בשידור חי", "results": "✅ תוצאות"},
+    "ro": {"name": "Română", "welcome": "👋 Bine ai venit, Campioane!", "choose": "👇 ALEGE SPORTUL TĂU 👇", "live": "🔴 LIVE", "results": "✅ REZULTATE"},
+}
+
+def get_text(chat_id, key):
+    lang = USER_LANG.get(str(chat_id), "en")
+    return LANGS.get(lang, LANGS["en"]).get(key, LANGS["en"][key])
+
 def bar(v1, v2, label):
     try:
         a = float(str(v1).replace('%',''))
@@ -65,8 +119,37 @@ def fetch_standings(sport, league):
     except:
         return None
 
+def get_lang_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🇱🇰 සිංහල", callback_data="lang_si"), InlineKeyboardButton("🇮🇳 தமிழ்", callback_data="lang_ta")],
+        [InlineKeyboardButton("🇬🇧 English", callback_data="lang_en"), InlineKeyboardButton("🇮🇳 हिन्दी", callback_data="lang_hi")],
+        [InlineKeyboardButton("🇵🇰 اردو", callback_data="lang_ur"), InlineKeyboardButton("🇧🇩 বাংলা", callback_data="lang_bn")],
+        [InlineKeyboardButton("🇸🇦 العربية", callback_data="lang_ar"), InlineKeyboardButton("🇪🇸 Español", callback_data="lang_es")],
+        [InlineKeyboardButton("🇫🇷 Français", callback_data="lang_fr"), InlineKeyboardButton("🇵🇹 Português", callback_data="lang_pt")],
+        [InlineKeyboardButton("🇷🇺 Русский", callback_data="lang_ru"), InlineKeyboardButton("🇨🇳 中文", callback_data="lang_zh")],
+        [InlineKeyboardButton("🇯🇵 日本語", callback_data="lang_ja"), InlineKeyboardButton("🇰🇷 한국어", callback_data="lang_ko")],
+        [InlineKeyboardButton("🇩🇪 Deutsch", callback_data="lang_de"), InlineKeyboardButton("🇮🇹 Italiano", callback_data="lang_it")],
+        [InlineKeyboardButton("🇳🇱 Nederlands", callback_data="lang_nl"), InlineKeyboardButton("🇹🇷 Türkçe", callback_data="lang_tr")],
+        [InlineKeyboardButton("🇮🇷 فارسی", callback_data="lang_fa"), InlineKeyboardButton("🇲🇾 Melayu", callback_data="lang_ms")],
+        [InlineKeyboardButton("🇮🇩 Indonesia", callback_data="lang_id"), InlineKeyboardButton("🇹🇭 ไทย", callback_data="lang_th")],
+        [InlineKeyboardButton("🇻🇳 Tiếng Việt", callback_data="lang_vi"), InlineKeyboardButton("🇵🇭 Filipino", callback_data="lang_tl")],
+        [InlineKeyboardButton("🇳🇵 नेपाली", callback_data="lang_ne"), InlineKeyboardButton("🇮🇳 ਪੰਜਾਬੀ", callback_data="lang_pa")],
+        [InlineKeyboardButton("🇮🇳 తెలుగు", callback_data="lang_te"), InlineKeyboardButton("🇮🇳 മലയാളം", callback_data="lang_ml")],
+        [InlineKeyboardButton("🇮🇳 ಕನ್ನಡ", callback_data="lang_kn"), InlineKeyboardButton("🇮🇳 मराठी", callback_data="lang_mr")],
+        [InlineKeyboardButton("🇮🇳 ગુજરાતી", callback_data="lang_gu"), InlineKeyboardButton("🇮🇳 ଓଡ଼ିଆ", callback_data="lang_or")],
+        [InlineKeyboardButton("🇲🇲 မြန်မာ", callback_data="lang_my"), InlineKeyboardButton("🇰🇭 ខ្មែរ", callback_data="lang_km")],
+        [InlineKeyboardButton("🇱🇦 ລາວ", callback_data="lang_lo"), InlineKeyboardButton("🇹🇿 Kiswahili", callback_data="lang_sw")],
+        [InlineKeyboardButton("🇳🇬 Hausa", callback_data="lang_ha"), InlineKeyboardButton("🇪🇹 አማርኛ", callback_data="lang_am")],
+        [InlineKeyboardButton("🇺🇦 Українська", callback_data="lang_uk"), InlineKeyboardButton("🇵🇱 Polski", callback_data="lang_pl")],
+        [InlineKeyboardButton("🇸🇪 Svenska", callback_data="lang_sv"), InlineKeyboardButton("🇫🇮 Suomi", callback_data="lang_fi")],
+        [InlineKeyboardButton("🇬🇷 Ελληνικά", callback_data="lang_el"), InlineKeyboardButton("🇮🇱 עברית", callback_data="lang_he")],
+        [InlineKeyboardButton("🇷🇴 Română", callback_data="lang_ro")],
+        [InlineKeyboardButton("Back to Menu", callback_data="menu_start")]
+    ])
+
 def get_main_keyboard():
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🌐 YOUR LANGUAGES", callback_data="menu_lang")],
         [InlineKeyboardButton("Football", callback_data="menu_football"), InlineKeyboardButton("Cricket", callback_data="menu_cricket")],
         [InlineKeyboardButton("IPL LIVE", callback_data="menu_ipl"), InlineKeyboardButton("LPL / SL", callback_data="menu_lpl")],
         [InlineKeyboardButton("Basketball", callback_data="menu_basketball"), InlineKeyboardButton("Tennis", callback_data="menu_tennis")],
@@ -305,32 +388,35 @@ def format_full(key):
     t += "".join(up[:3]) if up else "No Upcoming\n━━━━━━━━━━━━━━━━━━━━━━\n"
     return t
 
-WELCOME_TEXT = (
-    "╔══════════════════════╗\n"
-    "║  ✨ 🏆 PREMIUM SPORTS 🏆 ✨  ║\n"
-    "╚══════════════════════╝\n\n"
-    "    ⚽  🏏  🏀  🎾  🏈  ⚾\n"
-    "  <b>YADANAR LIVE SPORTS</b>\n"
-    "  <b>PREMIUM SPORTS</b>\n\n"
-    "━━━━━━━━━━━━━━━━━━━━━━\n"
-    "👋 <b>Welcome, Champion!</b>\n"
-    "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    "🔴 <b>LIVE SCORES</b>  •  Every 3 Minutes\n"
-    "⚽ <b>GOAL ALERTS</b>  •  Instant Update\n"
-    "🏆 <b>IPL • LPL • EPL • FIFA</b>\n"
-    "🏏 <b>CRICKET • FOOTBALL • TENNIS</b>\n"
-    "📊 <b>STATS • TABLE • RESULTS</b>\n\n"
-    "━━━━━━━━━━━━━━━━━━━━━━\n"
-    "👇 <b>CHOOSE YOUR SPORT BELOW</b> 👇\n"
-    "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    "💎 <i>Fastest • Beautiful • Free</i>\n"
-    "💬 <i>Join Our Family For Daily Live Updates</i>\n\n"
-    "━━━━━━━━━━━━━━━━━━━━━━\n"
-    "POWERD BY @bigolive_asia"
-)
+def get_welcome(chat_id):
+    w = get_text(chat_id, "welcome")
+    c = get_text(chat_id, "choose")
+    return (
+        "╔══════════════════════╗\n"
+        "║  ✨ 🏆 PREMIUM SPORTS 🏆 ✨  ║\n"
+        "╚══════════════════════╝\n\n"
+        "    ⚽  🏏  🏀  🎾  🏈  ⚾\n"
+        "  <b>YADANAR LIVE SPORTS</b>\n"
+        "  <b>PREMIUM SPORTS</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{w}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🔴 <b>LIVE SCORES</b>  •  Every 3 Minutes\n"
+        "⚽ <b>GOAL ALERTS</b>  •  Instant Update\n"
+        "🏆 <b>IPL • LPL • EPL • FIFA</b>\n"
+        "🏏 <b>CRICKET • FOOTBALL • TENNIS</b>\n"
+        "📊 <b>STATS • TABLE • RESULTS</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{c}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "💎 <i>Fastest • Beautiful • Free</i>\n"
+        "💬 <i>Join Our Family For Daily Live Updates</i>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "POWERD BY @bigolive_asia"
+    )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(WELCOME_TEXT, parse_mode="HTML", reply_markup=get_main_keyboard())
+    await update.message.reply_text(get_welcome(update.effective_chat.id), parse_mode="HTML", reply_markup=get_main_keyboard())
 
 async def send_sport_to_chat(chat_id, context, key):
     txt = format_full(key)
@@ -415,7 +501,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = q.data
     chat_id = update.effective_chat.id
     if data == "menu_start":
-        await context.bot.send_message(chat_id=chat_id, text=WELCOME_TEXT, parse_mode="HTML", reply_markup=get_main_keyboard())
+        await context.bot.send_message(chat_id=chat_id, text=get_welcome(chat_id), parse_mode="HTML", reply_markup=get_main_keyboard())
+    elif data == "menu_lang":
+        await context.bot.send_message(chat_id=chat_id, text="🌐 <b>CHOOSE YOUR LANGUAGE / YOUR LANGUAGES</b>\n\n🌍 Select Your Language Below 👇", parse_mode="HTML", reply_markup=get_lang_keyboard())
+    elif data.startswith("lang_"):
+        lang = data.replace("lang_", "")
+        USER_LANG[str(chat_id)] = lang
+        name = LANGS.get(lang, LANGS["en"])["name"]
+        welcome = LANGS.get(lang, LANGS["en"])["welcome"]
+        await context.bot.send_message(chat_id=chat_id, text=f"✅ Language Saved: <b>{name}</b>\n\n{welcome}", parse_mode="HTML", reply_markup=get_main_keyboard())
     elif data == "menu_live":
         await send_live_to_chat(chat_id, context)
     elif data == "menu_results":
